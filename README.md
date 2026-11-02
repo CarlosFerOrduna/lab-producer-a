@@ -11,8 +11,11 @@ Runs in its own `producer-a` namespace of the k3s cluster. [lab-producer-b](http
 Today:
 
 - `GET /health` returns `200 {"status":"ok"}`.
+- `POST /messages` publishes a `message.created` event to the processor (see [API](#api)).
+- Events go out through an `EventPublisher` interface. Today it posts them to the processor over HTTP, retrying transient failures; the Kafka stage replaces only that implementation.
 - Environment configuration validated at startup with Joi.
-- Multi-stage `Dockerfile` that runs as the unprivileged `node` user.
+- Multi-stage `Dockerfile` that runs as the unprivileged `node` user, on a base image pinned by digest.
+- A `compose.yaml` that publishes to the processor of [lab-processor](https://github.com/CarlosFerOrduna/lab-processor)'s compose.
 - npm scripts that CI will call:
 
 | Script              | What it does                                              |
@@ -28,7 +31,7 @@ NestJS 12 ships as ES modules only, so `npm test` runs Jest with `--experimental
 
 Planned:
 
-- Publish events to Kafka topics under `producer-a.*`.
+- Publish events to Kafka topics under `producer-a.*`, replacing the HTTP publisher.
 - Call the processor through the platform gateway, never directly.
 - One Redis for cache and a separate Redis for BullMQ queues.
 - No database of its own: persistent data belongs to the processor.
@@ -36,30 +39,45 @@ Planned:
 
 ## Run locally
 
-Requires Node 26 (see `.nvmrc`).
+Requires Node 26 (see `.nvmrc`) and a running processor (`docker compose up` in [lab-processor](https://github.com/CarlosFerOrduna/lab-processor) serves it on port 3000).
 
 ```bash
 nvm use
 npm ci
-npm run start:dev
-curl localhost:3000/health
+PORT=3001 PROCESSOR_URL=http://localhost:3000 npm run start:dev
+curl localhost:3001/health
 ```
 
-With Docker:
+With Docker Compose, on port 3001:
 
 ```bash
-docker build -t lab-producer-a:local .
-docker run --rm -p 3000:3000 lab-producer-a:local
+docker compose up --build
 ```
+
+The container reaches the processor through the host (`host.docker.internal`), so each service keeps its own compose project, as it will keep its own namespace in the cluster.
+
+## API
+
+| Method and path  | What it does                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /messages` | Body `{ "text": "..." }` (up to 500 characters). Publishes a `message.created` event and answers `202 { "eventId": "..." }`, or `503` if it could not. |
+
+```bash
+curl -X POST localhost:3001/messages -H 'content-type: application/json' -d '{"text":"hello"}'
+curl 'localhost:3000/events?source=producer-a'   # on the processor
+```
+
+Publishing makes up to 3 attempts with exponential backoff (200 ms, then 400 ms) and a 2 s timeout each. A `4xx` from the processor means a malformed event and is not retried. Each event carries its own `id`, and the processor stores an `id` only once, so a retry never duplicates an event.
 
 ## Configuration
 
 The service reads only real environment variables. `.env` files are ignored, so pass values in the shell (`PORT=4000 npm run start:dev`) or with `docker run -e`.
 
-| Variable   | Default      | Validation                                  |
-| ---------- | ------------ | ------------------------------------------- |
-| `NODE_ENV` | `production` | One of `development`, `test`, `production`. |
-| `PORT`     | `3000`       | A valid TCP port number.                    |
+| Variable        | Default      | Validation                                                                   |
+| --------------- | ------------ | ---------------------------------------------------------------------------- |
+| `NODE_ENV`      | `production` | One of `development`, `test`, `production`.                                  |
+| `PORT`          | `3000`       | A valid TCP port number.                                                     |
+| `PROCESSOR_URL` | required     | `http` or `https` URL of the processor, for example `http://localhost:3000`. |
 
 An invalid value stops the service at startup with a validation error. The image carries no environment-specific values: the same image runs in dev, stage and prod, and each environment's values come from its overlay in [lab-gitops](https://github.com/CarlosFerOrduna/lab-gitops).
 

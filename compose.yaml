@@ -1,0 +1,11 @@
+# Publishes to the processor started by lab-processor's compose, through the host.
+services:
+  producer-a:
+    build: .
+    image: lab-producer-a:local
+    environment:
+      PROCESSOR_URL: http://host.docker.internal:3000
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - '3001:3000'
