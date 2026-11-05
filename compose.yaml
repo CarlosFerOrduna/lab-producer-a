@@ -1,11 +1,59 @@
-# Publishes to the processor started by lab-processor's compose, through the host.
+# The queue's Valkey, the API and the worker. The worker publishes to the processor
+# started by lab-processor's compose, through the host.
+# VALKEY_PASSWORD comes from a local .env file, which is never committed.
+x-queue: &queue
+  QUEUE_HOST: valkey-queue
+  QUEUE_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+
 services:
+  valkey-queue:
+    image: valkey/valkey:9.1.3-alpine@sha256:bf09d58e96d6b4524a15396b65b242bbe18beebbcc15a04d8ee75ddac62fae0b
+    # The image's valkey user, from the start: no root and no user switch at startup.
+    user: '999:1000'
+    command: ['valkey-server', '/etc/valkey/valkey.conf']
+    environment:
+      REDISCLI_AUTH: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+    configs:
+      - source: valkey-queue-config
+        target: /etc/valkey/valkey.conf
+      - source: valkey-auth
+        target: /etc/valkey/auth.conf
+    healthcheck:
+      test: ['CMD-SHELL', 'valkey-cli ping | grep -q PONG']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - valkey-queue-data:/data
+
   producer-a:
     build: .
     image: lab-producer-a:local
+    environment: *queue
+    ports:
+      - '3001:3000'
+    depends_on:
+      valkey-queue:
+        condition: service_healthy
+
+  producer-a-worker:
+    image: lab-producer-a:local
+    command: ['node', 'dist/worker.js']
     environment:
+      <<: *queue
       PROCESSOR_URL: http://host.docker.internal:3000
     extra_hosts:
       - host.docker.internal:host-gateway
-    ports:
-      - '3001:3000'
+    depends_on:
+      valkey-queue:
+        condition: service_healthy
+
+configs:
+  valkey-queue-config:
+    file: ./valkey/queue.conf
+  valkey-auth:
+    content: |
+      requirepass ${VALKEY_PASSWORD}
+
+volumes:
+  valkey-queue-data:

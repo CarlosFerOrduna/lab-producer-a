@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { PublishingModule } from '../publishing/publishing.module';
+import { EventQueueModule } from '../queue/event-queue.module';
 import { MessagesController } from './messages.controller';
 import { MessagesService } from './messages.service';
 
 @Module({
-  imports: [PublishingModule],
+  imports: [EventQueueModule],
   controllers: [MessagesController],
   providers: [MessagesService],
 })
