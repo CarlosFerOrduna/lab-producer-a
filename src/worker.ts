@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './worker/worker.module';
 
-// The worker serves only GET /health, for its liveness probe.
+// El worker solo expone GET /health: lo necesita su liveness probe.
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(WorkerModule);
   app.enableShutdownHooks();

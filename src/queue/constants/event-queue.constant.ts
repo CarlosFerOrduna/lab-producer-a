@@ -3,11 +3,11 @@ export const EVENT_QUEUE = {
   jobName: 'publish',
   queueToken: Symbol('EventQueue'),
   probeClientToken: Symbol('EventQueueProbeClient'),
-  // With 1-minute retries at most, about a day of attempts before a job is marked failed.
+  // Con reintentos de 1 minuto como máximo, alcanza para cerca de un día antes de marcar el job como fallido.
   attempts: 1440,
   initialBackoffMs: 1000,
   maxBackoffMs: 60_000,
-  // noeviction never frees memory on its own: finished jobs must be trimmed.
+  // Con noeviction, Valkey nunca libera memoria solo: hay que recortar los jobs terminados.
   keepCompletedJobs: 1000,
   keepFailedJobsSeconds: 7 * 24 * 60 * 60,
   workerConcurrency: 5,

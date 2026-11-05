@@ -4,6 +4,7 @@ import { workerEnvValidationSchema } from '../config/env-validation.schema';
 import { HealthModule } from '../health/health.module';
 import { PublishingModule } from '../publishing/publishing.module';
 import { EventPublishWorkerService } from './event-publish-worker.service';
+import { EventPublishProcessor } from './event-publish.processor';
 
 @Module({
   imports: [
@@ -15,6 +16,6 @@ import { EventPublishWorkerService } from './event-publish-worker.service';
     HealthModule,
     PublishingModule,
   ],
-  providers: [EventPublishWorkerService],
+  providers: [EventPublishProcessor, EventPublishWorkerService],
 })
 export class WorkerModule {}

@@ -4,7 +4,7 @@ import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { PublishedEvent } from '../publishing/types/published-event.type';
 import { EVENT_QUEUE } from './constants/event-queue.constant';
-import { queueConnectionOptions } from './queue-connection.util';
+import { EventQueueUtil } from './event-queue.util';
 
 @Module({
   providers: [
@@ -14,7 +14,7 @@ import { queueConnectionOptions } from './queue-connection.util';
       useFactory: (config: ConfigService) =>
         new Queue<PublishedEvent>(EVENT_QUEUE.name, {
           // Sin cola offline: si Valkey no está, encolar falla enseguida en vez de colgar el pedido.
-          connection: { ...queueConnectionOptions(config), enableOfflineQueue: false },
+          connection: { ...EventQueueUtil.connectionOptions(config), enableOfflineQueue: false },
           defaultJobOptions: {
             attempts: EVENT_QUEUE.attempts,
             backoff: { type: 'custom' },
@@ -24,11 +24,11 @@ import { queueConnectionOptions } from './queue-connection.util';
         }),
     },
     {
-      // A plain client on the same Valkey, for the readiness write probe: BullMQ 6 keeps its own connection private.
+      // Cliente propio sobre el mismo Valkey para la readiness: BullMQ 6 no expone su conexión.
       provide: EVENT_QUEUE.probeClientToken,
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>
-        new Redis({ ...queueConnectionOptions(config), enableOfflineQueue: false, maxRetriesPerRequest: 1 }),
+        new Redis({ ...EventQueueUtil.connectionOptions(config), enableOfflineQueue: false, maxRetriesPerRequest: 1 }),
     },
   ],
   exports: [EVENT_QUEUE.queueToken, EVENT_QUEUE.probeClientToken],
