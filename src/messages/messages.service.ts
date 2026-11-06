@@ -6,19 +6,24 @@ import { PublishedEvent } from '../publishing/types/published-event.type';
 import { EVENT_QUEUE } from '../queue/constants/event-queue.constant';
 import { EventEnqueueError } from '../queue/event-enqueue.error';
 import { SendMessageDto } from './dto/send-message.dto';
+import { SentMessage } from './types/sent-message.type';
 
 @Injectable()
 export class MessagesService {
   constructor(@Inject(EVENT_QUEUE.queueToken) private readonly eventQueue: Queue<PublishedEvent>) {}
 
-  /** Queues a message.created event and returns its id. The worker publishes it later. */
-  async send(message: SendMessageDto): Promise<string> {
+  /**
+   * Gives the message its own id, queues a message.created event about it and returns both ids.
+   * The worker publishes the event later.
+   */
+  async send(message: SendMessageDto): Promise<SentMessage> {
+    const messageId = randomUUID();
     const event: PublishedEvent = {
       id: randomUUID(),
       source: PUBLISHING.eventSource,
       type: 'message.created',
       occurredAt: new Date().toISOString(),
-      payload: { text: message.text },
+      payload: { messageId, text: message.text },
     };
 
     try {
@@ -28,6 +33,9 @@ export class MessagesService {
       throw new EventEnqueueError(`Event ${event.id} could not be queued`, { cause: error });
     }
 
-    return event.id;
+    return {
+      eventId: event.id,
+      messageId,
+    };
   }
 }

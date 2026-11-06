@@ -3,6 +3,7 @@ import { JoiValidationPipe } from '../common/pipes/joi-validation.pipe';
 import { EventEnqueueError } from '../queue/event-enqueue.error';
 import { SendMessageDto, sendMessageSchema } from './dto/send-message.dto';
 import { MessagesService } from './messages.service';
+import { SentMessage } from './types/sent-message.type';
 
 @Controller('messages')
 export class MessagesController {
@@ -11,10 +12,9 @@ export class MessagesController {
   /** Answers 202 once the event is safely in the queue, not when the processor has it. */
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
-  async send(@Body(new JoiValidationPipe(sendMessageSchema)) message: SendMessageDto): Promise<{ eventId: string }> {
+  async send(@Body(new JoiValidationPipe(sendMessageSchema)) message: SendMessageDto): Promise<SentMessage> {
     try {
-      const eventId = await this.messagesService.send(message);
-      return { eventId };
+      return await this.messagesService.send(message);
     } catch (error) {
       if (error instanceof EventEnqueueError) {
         throw new ServiceUnavailableException('The event could not be queued', { cause: error });
