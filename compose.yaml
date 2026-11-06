@@ -1,5 +1,5 @@
-# The queue's Valkey, the API and the worker. The worker publishes to the processor
-# started by lab-processor's compose, through the host.
+# The queue's Valkey and the API. The worker publishes to Kafka with mTLS, which
+# compose does not run: it runs only in the cluster, and here events wait in the queue.
 # VALKEY_PASSWORD comes from a local .env file, which is never committed.
 x-queue: &queue
   QUEUE_HOST: valkey-queue
@@ -32,18 +32,6 @@ services:
     environment: *queue
     ports:
       - '3001:3000'
-    depends_on:
-      valkey-queue:
-        condition: service_healthy
-
-  producer-a-worker:
-    image: lab-producer-a:local
-    command: ['node', 'dist/worker.js']
-    environment:
-      <<: *queue
-      PROCESSOR_URL: http://host.docker.internal:3000
-    extra_hosts:
-      - host.docker.internal:host-gateway
     depends_on:
       valkey-queue:
         condition: service_healthy
